@@ -97,6 +97,7 @@ void dump(float *variables, int nel, int nelr)
 
 void initialize_variables(int nelr, float *variables, float *ff_variable)
 {
+	#pragma omp parallel for schedule(static)
 	for (int i = 0; i < nelr; i++)
 	{
 		for (int j = 0; j < NVAR; j++)
@@ -437,6 +438,7 @@ int main(int argc, char **argv)
 
 	// these need to be computed the first time in order to compute time step
 	std::cout << "Starting..." << std::endl;
+	double start = omp_get_wtime();
 
 	// Begin iterations
 	for (int i = 0; i < iterations; i++)
@@ -452,6 +454,9 @@ int main(int argc, char **argv)
 			time_step(j, nelr, old_variables, variables, step_factors, fluxes);
 		}
 	}
+
+	double end = omp_get_wtime();
+	std::cout << "Compute time: " << (end - start) << std::endl;
 
 	std::cout << "Saving solution..." << std::endl;
 	dump(variables, nel, nelr);
