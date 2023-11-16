@@ -1,0 +1,39 @@
+Prima di tutto createvi il vostro branch di lavoro. Esempio il mio è atirelli
+    git checkout -b atirelli
+
+    *il comando 'git checkout' per spostarvi tra branch esistenti
+    *opzione '-b' permette di creare un nuovo branch e spostarvi direttamente su quello
+Io proporrei di lavorare sui nostri branch che creiamo per evitare casini di merge, pull, fetch etc
+visto che valoriamo sullo stesso file, per evitare conflitti. Inoltre possiamo guardarci il lavoro a vicenda
+e se una soluzione ci piace, possiamo fare il merge e prenderla nei nostri rispettivi rami di lavoro e continuare
+da quel punto.
+
+Per salvare il lavoro:
+    git add "percorsofile/nomefile" (anche più di uno), oppure vi basta fare il comune:
+    git add . => questo vi aggiunge allo store per il commit tutti i file modificati
+    git commit -m "messaggio" aggiungete il messaggio che volete per descrivere il lavoro fatto
+
+    ! IMPORTATE ! - Pushare il lavoro sul repository
+    git push -u mirror-5 "branch", nel mio caso sarà git push -u mirror-5 atirelli
+    Fate attenzione, perché come io o comunemente il comando è (git push -u origin ....), però la repository
+    "origin" è già utilizzata dal prof che è collegata al suo ramo di GitLab, se usate "origin" rischiate di 
+    pushare il vostro lavoro sulla repo e ramo del prof e quindi aver problemi e rischiate di perdere quel lavoro
+    svolto. Uuindi ho fatto un mirror che punta al repo nostra condivisa e l'ho chiamato "mirror-5".
+    Quindi vi basta fare:
+    git push -u mirror-5 "branch"
+
+TL;DR:
+    1) Clonate la repository:
+    git clone https://github.com/andreatirelli3/hpc-lab-assignment-repo.git
+
+    2) Create il vostro branch
+    git checkout -b "nomebranch" (il mio l'ho chiamato atirelli)
+
+    3) Aggiungere le modifiche allo store per il commit
+    git add .
+
+    4) Committare il lavoro
+    git commit -m "messaggio"
+
+    5) Publiccare il lavoro sul vostro ramo
+    git push -u mirror-5 "nomebranch" (nel mio caso git push -u mirror-5 atirelli)
