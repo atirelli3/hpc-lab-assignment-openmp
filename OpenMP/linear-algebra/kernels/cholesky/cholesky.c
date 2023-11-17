@@ -51,6 +51,8 @@ static void kernel_cholesky(int n,
   int i, j, k;
 
   DATA_TYPE x;
+
+  #pragma omp parallel for
   for (i = 0; i < _PB_N; ++i)
   {
     x = A[i][i];
