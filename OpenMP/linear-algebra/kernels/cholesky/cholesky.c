@@ -89,11 +89,10 @@ int main(int argc, char **argv)
   /* Start timer. */
   polybench_start_instruments;
 
-  #pragma omp parallel
-  {
-    /* Run kernel. */
-    kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
-  }
+
+  /* Run kernel. */
+  kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
+
 
   /* Stop and print timer. */
   polybench_stop_instruments;
