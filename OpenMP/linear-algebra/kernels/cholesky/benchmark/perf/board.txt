@@ -1,0 +1,34 @@
+SEQUENTIAL SOLUTION
+
+$ perf stat -B -e cache-references,cache-misses,cycles,instructions,branches,faults,migrations ./cholesky_acc 
+
+ Performance counter stats for './cholesky_acc':
+
+       361.896.748      cache-references                                            
+        24.774.631      cache-misses              #    6,846 % of all cache refs    
+       924.084.814      cycles                                                      
+     1.087.705.121      instructions              #    1,18  insn per cycle         
+   <not supported>      branches                                                    
+               583      faults                                                      
+                 0      migrations                                                  
+
+       0,635748197 seconds time elapsed
+
+$ perf stat -e cpu-cycles,instructions,cache-references,cache-misses,branches,branch-misses,L1-dcache-load-misses,L1-dcache-store-misses,L1-icache-load-misses,dTLB-load-misses,dTLB-store-misses,iTLB-load-misses ./cholesky_acc 
+
+ Performance counter stats for './cholesky_acc':
+
+       922.228.232      cpu-cycles                                                    (69,32%)
+     1.091.634.304      instructions              #    1,18  insn per cycle           (69,32%)
+       362.813.936      cache-references                                              (69,32%)
+        24.394.923      cache-misses              #    6,724 % of all cache refs      (69,31%)
+   <not supported>      branches                                                    
+           520.778      branch-misses                                                 (70,78%)
+        24.112.813      L1-dcache-load-misses                                         (70,97%)
+        24.342.549      L1-dcache-store-misses                                        (71,16%)
+            57.328      L1-icache-load-misses                                         (60,98%)
+           197.139      dTLB-load-misses                                              (60,34%)
+   <not supported>      dTLB-store-misses                                           
+             9.169      iTLB-load-misses                                              (59,70%)
+
+       0,628748773 seconds time elapsed
