@@ -51,20 +51,30 @@ static void kernel_cholesky(int n,
   int i, j, k;
   DATA_TYPE x, y;
 
+  #pragma omp parallel
+  #pragma omp single nowait
   for (i = 0; i < _PB_N; ++i)
   { 
     x = A[i][i];
-    #pragma omp parallel for private(j) reduction(-:x)
-    for (j = 0; j <= i - 1; ++j)
-      x -= A[i][j] * A[i][j];
-    p[i] = 1.0 / sqrt(x);
+    // #pragma omp parallel for private(j) reduction(-:x)
+    #pragma omp task private(j) shared(A,p,i)
+    {
+      #pragma omp simd
+      for (j = 0; j <= i - 1; ++j)
+        x -= A[i][j] * A[i][j];
+      p[i] = 1.0 / sqrt(x);
+    }
+    
 
-    #pragma omp parallel for private(j) schedule(dynamic)
+    // #pragma omp parallel for private(j) schedule(dynamic)
     for (j = i + 1; j < _PB_N; ++j)
     {
       y = A[i][j];
+      #pragma omp simd
       for (k = 0; k <= i - 1; ++k)
         y = y - A[j][k] * A[i][k];
+
+      #pragma omp taskwait
       A[j][i] = y * p[i];
     }
   }
