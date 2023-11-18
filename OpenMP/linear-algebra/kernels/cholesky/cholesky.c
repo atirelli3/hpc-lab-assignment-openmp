@@ -48,27 +48,31 @@ static void kernel_cholesky(int n,
                             DATA_TYPE POLYBENCH_1D(p, N, n),
                             DATA_TYPE POLYBENCH_2D(A, N, N, n, n))
 {
-  int i, j, k, l;
-
+  // int i, j, k, l;
+  int i;
   DATA_TYPE x, y;
 
-  #pragma omp parallel for
+  // #pragma omp parallel for
   for (i = 0; i < _PB_N; ++i)
   {
-    #pragma omp task
-    {
-      x = A[i][i];
-      for (j = 0; j <= i - 1; ++j)
-        x = x - A[i][j] * A[i][j];
-      p[i] = 1.0 / sqrt(x);
-    }
+    // #pragma omp task shared(i, p, A)
+    // {
+    x = A[i][i];
+    int j;
+    #pragma omp parallel for reduction(-:x)
+    for (j = 0; j <= i - 1; ++j)
+      x -= A[i][j] * A[i][j];
+    p[i] = 1.0 / sqrt(x);
+    // }
 
-    for (l + i + 1; l < _PB_N; ++l)
+    int l;
+    #pragma omp parallel for
+    for (l = i + 1; l < _PB_N; ++l)
     {
       y = A[i][l];
+      int k;
       for (k = 0; k <= i - 1; ++k)
         y = y - A[l][k] * A[i][k];
-      #pragma omp taskwait
       A[l][i] = y * p[i];
     }
   }
@@ -91,6 +95,8 @@ int main(int argc, char **argv)
 
 
   /* Run kernel. */
+  #pragma omp parallel
+  #pragma omp single
   kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
 
 
