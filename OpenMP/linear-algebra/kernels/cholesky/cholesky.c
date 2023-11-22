@@ -49,6 +49,31 @@ static void kernel_cholesky(int n,
                             DATA_TYPE POLYBENCH_2D(A, N, N, n, n))
 {
   int i, j, k;
+
+  DATA_TYPE x;
+  for (i = 0; i < _PB_N; ++i)
+  {
+    x = A[i][i];
+    for (j = 0; j <= i - 1; ++j)
+      x = x - A[i][j] * A[i][j];
+    p[i] = 1.0 / sqrt(x);
+    for (j = i + 1; j < _PB_N; ++j)
+    {
+      x = A[i][j];
+      for (k = 0; k <= i - 1; ++k)
+        x = x - A[j][k] * A[i][k];
+      A[j][i] = x * p[i];
+    }
+  }
+}
+
+/* Main computational kernel optimize. The whole function will be timed,
+   including the call and return. */
+static void opt_kernel_cholesky(int n,
+                            DATA_TYPE POLYBENCH_1D(p, N, n),
+                            DATA_TYPE POLYBENCH_2D(A, N, N, n, n))
+{
+  int i, j, k;
   DATA_TYPE x, y;
 
   for (i = 0; i < _PB_N; ++i)
@@ -87,7 +112,11 @@ int main(int argc, char **argv)
 
 
   /* Run kernel. */
-  kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
+  #ifdef PARALLEL_OPT
+    opt_kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
+  #else
+    kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
+  #endif
 
 
   /* Stop and print timer. */
