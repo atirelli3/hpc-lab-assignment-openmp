@@ -10,4 +10,5 @@ dataset_names=$(awk '/#.*_DATASET/ && !/#.*!defined/ {print $3}' "$cholesky_file
 for dataset_name in $dataset_names; do
     echo "Executing for dataset: $dataset_name"
     make EXT_CFLAGS="-DPOLYBENCH_TIME -D${dataset_name} -DPARALLEL_OPT" clean all
+    perf stat -B -e cache-references,cache-misses,cycles,instructions,branches,faults,migrations ./cholesky_acc
 done
