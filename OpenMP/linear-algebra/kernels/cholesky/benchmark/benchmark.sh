@@ -1,13 +1,35 @@
 #!/bin/bash
 
+cd ..
+
 # Set the path to the cholesky.h file
 cholesky_file="cholesky.h"
 
 # Extract dataset names from the file
 dataset_names=$(awk '/#.*_DATASET/ && !/#.*!defined/ {print $3}' "$cholesky_file")
 
+# Function to run with perf stat and suppress other outputs
+run_with_perf() {
+    make EXT_CFLAGS="$1 -DPOLYBENCH_DUMP_ARRAYS" clean all > /dev/null 2>&1
+    perf stat -B -e cache-references,cache-misses,cycles,instructions,branches,faults,migrations ./cholesky_acc > /dev/null 2>&1
+}
+
 # Iterate over dataset names and execute the command
 for dataset_name in $dataset_names; do
-    echo "Executing for dataset: $dataset_name"
-    make EXT_CFLAGS="-DPOLYBENCH_TIME -D${dataset_name} -DPARALLEL_OPT" clean all
+    echo "### Executing for dataset: $dataset_name"
+
+    # SEQUENTIAL
+    echo "=> $dataset_name SEQUENTIAL"
+    run_with_perf "-D${dataset_name}"
+    ./cholesky_acc > out_seq.txt 2>&1
+
+    # PARALLEL_OPT
+    echo "=> $dataset_name PARALLEL_OPT"
+    run_with_perf "-D${dataset_name} -DPARALLEL_OPT"
+    ./cholesky_acc > out_opt.txt 2>&1
+
+    # Compare the output files
+    echo "### Diff between out_seq.txt and out_opt.txt:"
+    diff -u -q out_seq.txt out_opt.txt
 done
+
