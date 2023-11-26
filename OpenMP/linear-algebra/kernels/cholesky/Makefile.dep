@@ -1,0 +1,2 @@
+cholesky.o: cholesky.c ../../../utilities/polybench.h cholesky.h
+polybench.o: ../../../utilities/polybench.c
