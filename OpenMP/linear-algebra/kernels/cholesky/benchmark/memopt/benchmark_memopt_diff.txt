@@ -1,0 +1,19 @@
+256980@nano:~/group-5/hpc-lab-assignment-repo/OpenMP/linear-algebra/kernels/cholesky/benchmark$ ./benchmark.sh 
+####### Executing for dataset: STANDARD_DATASET #######
+@@@@@ => STANDARD_DATASET SEQUENTIAL
+###################################################
+####### Executing for dataset: MINI_DATASET #######
+@@@@@ => MINI_DATASET SEQUENTIAL
+###################################################
+####### Executing for dataset: SMALL_DATASET #######
+@@@@@ => SMALL_DATASET SEQUENTIAL
+###################################################
+####### Executing for dataset: STANDARD_DATASET #######
+@@@@@ => STANDARD_DATASET SEQUENTIAL
+###################################################
+####### Executing for dataset: LARGE_DATASET #######
+@@@@@ => LARGE_DATASET SEQUENTIAL
+###################################################
+####### Executing for dataset: EXTRALARGE_DATASET #######
+@@@@@ => EXTRALARGE_DATASET SEQUENTIAL
+###################################################

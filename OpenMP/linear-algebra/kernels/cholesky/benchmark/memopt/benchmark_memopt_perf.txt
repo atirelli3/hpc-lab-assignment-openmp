@@ -1,0 +1,175 @@
+256980@nano:~/group-5/hpc-lab-assignment-repo/OpenMP/linear-algebra/kernels/cholesky/benchmark$ ./benchmark.sh 
+####### Executing for dataset: STANDARD_DATASET #######
+@@@@@ => STANDARD_DATASET SEQUENTIAL
+
+ Performance counter stats for './cholesky_acc':
+
+       361.906.507      cache-references                                            
+        24.461.557      cache-misses              #    6,759 % of all cache refs    
+       922.569.600      cycles                                                      
+     1.087.719.167      instructions              #    1,18  insn per cycle         
+   <not supported>      branches                                                    
+               582      faults                                                      
+                 0      migrations                                                  
+
+       0,626913832 seconds time elapsed
+
+
+ Performance counter stats for './cholesky_acc':
+
+       236.559.311      cache-references                                            
+        24.968.696      cache-misses              #   10,555 % of all cache refs    
+       989.294.639      cycles                                                      
+       935.639.612      instructions              #    0,95  insn per cycle         
+   <not supported>      branches                                                    
+               594      faults                                                      
+                 0      migrations                                                  
+
+       0,176713838 seconds time elapsed
+
+###################################################
+####### Executing for dataset: MINI_DATASET #######
+@@@@@ => MINI_DATASET SEQUENTIAL
+
+ Performance counter stats for './cholesky_acc':
+
+           506.050      cache-references                                            
+            17.333      cache-misses              #    3,425 % of all cache refs    
+         2.699.759      cycles                                                      
+         1.261.522      instructions              #    0,47  insn per cycle         
+   <not supported>      branches                                                    
+                71      faults                                                      
+                 0      migrations                                                  
+
+       0,004651519 seconds time elapsed
+
+
+ Performance counter stats for './cholesky_acc':
+
+           971.650      cache-references                                            
+            26.973      cache-misses              #    2,776 % of all cache refs    
+         4.199.122      cycles                                                      
+         3.565.152      instructions              #    0,85  insn per cycle         
+   <not supported>      branches                                                    
+                75      faults                                                      
+                 0      migrations                                                  
+
+       0,004779074 seconds time elapsed
+
+###################################################
+####### Executing for dataset: SMALL_DATASET #######
+@@@@@ => SMALL_DATASET SEQUENTIAL
+
+ Performance counter stats for './cholesky_acc':
+
+         1.255.154      cache-references                                            
+            69.321      cache-misses              #    5,523 % of all cache refs    
+         4.273.928      cycles                                                      
+         3.532.439      instructions              #    0,83  insn per cycle         
+   <not supported>      branches                                                    
+                99      faults                                                      
+                 0      migrations                                                  
+
+       0,006272530 seconds time elapsed
+
+
+ Performance counter stats for './cholesky_acc':
+
+         2.419.055      cache-references                                            
+            63.667      cache-misses              #    2,632 % of all cache refs    
+         8.423.611      cycles                                                      
+         9.816.153      instructions              #    1,17  insn per cycle         
+   <not supported>      branches                                                    
+               110      faults                                                      
+                 0      migrations                                                  
+
+       0,005884504 seconds time elapsed
+
+###################################################
+####### Executing for dataset: STANDARD_DATASET #######
+@@@@@ => STANDARD_DATASET SEQUENTIAL
+
+ Performance counter stats for './cholesky_acc':
+
+       361.898.961      cache-references                                            
+        24.269.269      cache-misses              #    6,706 % of all cache refs    
+       922.929.941      cycles                                                      
+     1.087.772.189      instructions              #    1,18  insn per cycle         
+   <not supported>      branches                                                    
+               581      faults                                                      
+                 0      migrations                                                  
+
+       0,629194695 seconds time elapsed
+
+
+ Performance counter stats for './cholesky_acc':
+
+       214.640.414      cache-references                                            
+        25.042.704      cache-misses              #   11,667 % of all cache refs    
+     1.098.005.252      cycles                                                      
+       803.773.155      instructions              #    0,73  insn per cycle         
+   <not supported>      branches                                                    
+               594      faults                                                      
+                 4      migrations                                                  
+
+       0,195163977 seconds time elapsed
+
+###################################################
+####### Executing for dataset: LARGE_DATASET #######
+@@@@@ => LARGE_DATASET SEQUENTIAL
+
+ Performance counter stats for './cholesky_acc':
+
+     2.680.125.366      cache-references                                            
+       178.571.566      cache-misses              #    6,663 % of all cache refs    
+     6.269.789.560      cycles                                                      
+     8.047.516.070      instructions              #    1,28  insn per cycle         
+   <not supported>      branches                                                    
+               729      faults                                                      
+                 0      migrations                                                  
+
+       4,242943501 seconds time elapsed
+
+
+ Performance counter stats for './cholesky_acc':
+
+     1.459.729.986      cache-references                                            
+       179.924.840      cache-misses              #   12,326 % of all cache refs    
+     9.135.621.810      cycles                                                      
+     5.307.217.743      instructions              #    0,58  insn per cycle         
+   <not supported>      branches                                                    
+               738      faults                                                      
+                 6      migrations                                                  
+
+       1,563108770 seconds time elapsed
+
+###################################################
+####### Executing for dataset: EXTRALARGE_DATASET #######
+@@@@@ => EXTRALARGE_DATASET SEQUENTIAL
+
+ Performance counter stats for './cholesky_acc':
+
+    21.396.869.128      cache-references                                            
+     1.799.015.321      cache-misses              #    8,408 % of all cache refs    
+    47.774.640.863      cycles                                                      
+    64.213.816.717      instructions              #    1,34  insn per cycle         
+   <not supported>      branches                                                    
+               662      faults                                                      
+                 0      migrations                                                  
+
+      32,323157768 seconds time elapsed
+
+
+ Performance counter stats for './cholesky_acc':
+
+    11.090.852.232      cache-references                                            
+     1.808.764.212      cache-misses              #   16,309 % of all cache refs    
+    75.620.518.894      cycles                                                      
+    39.372.907.266      instructions              #    0,52  insn per cycle         
+   <not supported>      branches                                                    
+               674      faults                                                      
+                53      migrations                                                  
+
+      12,875926201 seconds time elapsed
+
+###################################################
