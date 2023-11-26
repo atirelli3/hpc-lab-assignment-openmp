@@ -207,6 +207,7 @@ int main(int argc, char **argv)
   /* Variable declaration/allocation. */
   POLYBENCH_2D_ARRAY_DECL(A, DATA_TYPE, N, N, n, n);
   POLYBENCH_1D_ARRAY_DECL(p, DATA_TYPE, N, n);
+  MatrixVector *mv = (MatrixVector *)malloc(sizeof(MatrixVector));
 
   #ifdef MEM_OPT
     /* Initialize the linearization struct. */
@@ -240,11 +241,17 @@ int main(int argc, char **argv)
 
   /* Prevent dead-code elimination. All live-out data must be printed
      by the function call in argument. */
-  polybench_prevent_dce(print_array(n, POLYBENCH_ARRAY(A)));
+  #ifdef MEM_OPT
+    polybench_prevent_dce(mem_print_array(n, mv));
+  #else
+   polybench_prevent_dce(print_array(n, POLYBENCH_ARRAY(A)));
+  #endif
+
 
   /* Be clean. */
   POLYBENCH_FREE_ARRAY(A);
   POLYBENCH_FREE_ARRAY(p);
+  free(mv);
 
   return 0;
 }
