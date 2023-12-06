@@ -1,5 +1,5 @@
--include ../../../utilities/options.mk
--include ../../../utilities/c2.mk
+# -include ../../../utilities/options.mk
+# -include ../../../utilities/c2.mk
 
 NVCC=$(CUDA_HOME)/bin/nvcc
 CXX=g++
