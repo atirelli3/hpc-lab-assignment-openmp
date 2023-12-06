@@ -69,6 +69,19 @@ static void kernel_cholesky(int n,
   }
 }
 
+
+/* 
+* Main computational kernel on the device (GPU). 
+* 
+* The whole function will be timed, including the call and return. 
+*/
+static void device_cholesky(int n,
+                            DATA_TYPE POLYBENCH_1D(p, N, n),
+                            DATA_TYPE POLYBENCH_1D(A_opt, N, n))
+{
+
+}
+
 // TODO: Fix the output correctness.
 /* Main computational kernel optimize. The whole function will be timed,
    including the call and return. */
