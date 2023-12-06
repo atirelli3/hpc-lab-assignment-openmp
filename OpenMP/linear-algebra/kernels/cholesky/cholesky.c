@@ -19,11 +19,12 @@
  *
  * This structure can be used to perform various matrix and vector operations.
  */
-typedef struct
-{ 
-  DATA_TYPE p[N];  // Vector of size N
-  DATA_TYPE A[N * N];  // Matrix of size N*N
-} MatrixVector;
+
+// typedef struct
+// { 
+//   DATA_TYPE p[N];  // Vector of size N
+//   DATA_TYPE A[N * N];  // Matrix of size N*N
+// } MatrixVector;
 
 
 /* Array initialization. */
@@ -52,17 +53,17 @@ static void init_array(int n,
  * with the value 1.0/n. This means that after the function call, all elements of 'p' and 'A' 
  * will be equal to 1.0/n.
  */
-static void mem_init_array(int n, MatrixVector* mv)
-{
-  int i, j;
+// static void mem_init_array(int n, MatrixVector* mv)
+// {
+//   int i, j;
 
-  for (i = 0; i < n; i++)
-  {
-    mv->p[i] = 1.0 / n;
-    for (j = 0; j < n; j++)
-      mv->A[i * n + j] = 1.0 / n;
-  }
-}
+//   for (i = 0; i < n; i++)
+//   {
+//     mv->p[i] = 1.0 / n;
+//     for (j = 0; j < n; j++)
+//       mv->A[i * n + j] = 1.0 / n;
+//   }
+// }
 
 
 /* DCE code. Must scan the entire live-out data.
@@ -93,18 +94,18 @@ static void print_array(int n,
  * After every 20 elements, it prints a newline character. This is done to ensure that the 
  * output is neatly formatted and easy to read.
  */
-static void mem_print_array(int n, MatrixVector* mv)
-{
-  int i, j;
+// static void mem_print_array(int n, MatrixVector* mv)
+// {
+//   int i, j;
 
-  for (i = 0; i < n; i++)
-    for (j = 0; j < n; j++)
-    {
-      fprintf(stderr, DATA_PRINTF_MODIFIER, mv->A[i * n + j]);
-      if ((i * n + j) % 20 == 0)
-        fprintf(stderr, "\n");
-    }
-}
+//   for (i = 0; i < n; i++)
+//     for (j = 0; j < n; j++)
+//     {
+//       fprintf(stderr, DATA_PRINTF_MODIFIER, mv->A[i * n + j]);
+//       if ((i * n + j) % 20 == 0)
+//         fprintf(stderr, "\n");
+//     }
+// }
 
 
 /* Main computational kernel. The whole function will be timed,
@@ -148,31 +149,31 @@ static void kernel_cholesky(int n,
  * perform a reduction on the variable 'x' in a thread-safe manner. The 'private' clause is used 
  * to specify that the variables 'x' and 'k' are private to each thread.
  */
-static void mem_kernel_cholesky(int n, MatrixVector* mv)
-{
-  int i, j, k;
+// static void mem_kernel_cholesky(int n, MatrixVector* mv)
+// {
+//   int i, j, k;
 
-  DATA_TYPE x;
-  for (i = 0; i < n; ++i)
-  {
-    x = mv->A[i * n + i];
-    #pragma omp parallel for reduction(-:x)
-    for (j = 0; j <= i - 1; ++j)
-      x = x - mv->A[i * n + j] * mv->A[i * n + j];
-    mv->p[i] = 1.0 / sqrt(x);
-    #pragma omp parallel for private(x, k)
-    for (j = i + 1; j < n; ++j)
-    {
-      x = mv->A[i * n + j];
-      #pragma omp simd reduction(-:x)
-      for (k = 0; k <= i - 1; ++k)
-        x = x - mv->A[j * n + k] * mv->A[i * n + k];
-      mv->A[j * n + i] = x * mv->p[i];
-    }
-  }
-}
+//   DATA_TYPE x;
+//   for (i = 0; i < n; ++i)
+//   {
+//     x = mv->A[i * n + i];
+//     #pragma omp parallel for reduction(-:x)
+//     for (j = 0; j <= i - 1; ++j)
+//       x = x - mv->A[i * n + j] * mv->A[i * n + j];
+//     mv->p[i] = 1.0 / sqrt(x);
+//     #pragma omp parallel for private(x, k)
+//     for (j = i + 1; j < n; ++j)
+//     {
+//       x = mv->A[i * n + j];
+//       #pragma omp simd reduction(-:x)
+//       for (k = 0; k <= i - 1; ++k)
+//         x = x - mv->A[j * n + k] * mv->A[i * n + k];
+//       mv->A[j * n + i] = x * mv->p[i];
+//     }
+//   }
+// }
 
-
+// TODO: Fix the output correctness.
 /* Main computational kernel optimize. The whole function will be timed,
    including the call and return. */
 static void opt_kernel_cholesky(int n,
@@ -205,35 +206,45 @@ int main(int argc, char **argv)
   int n = N;
 
   /* Variable declaration/allocation. */
+  // TODO: Linearize the array (1D) A with dimension N*N
   POLYBENCH_2D_ARRAY_DECL(A, DATA_TYPE, N, N, n, n);
   POLYBENCH_1D_ARRAY_DECL(p, DATA_TYPE, N, n);
-  MatrixVector *mv = (MatrixVector *)malloc(sizeof(MatrixVector));
+  // MatrixVector *mv = (MatrixVector *)malloc(sizeof(MatrixVector));
 
-  #ifdef MEM_OPT
-    /* Initialize the linearization struct. */
-    mem_init_array(n, mv);
-  #else
-    /* Initialize array(s). */
-    init_array(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
-  #endif
+  // #ifdef MEM_OPT
+  //   /* Initialize the linearization struct. */
+  //   mem_init_array(n, mv);
+  // #else
+  //   /* Initialize array(s). */
+  //   init_array(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
+  // #endif
+
+  /* Initialize array(s). */
+  init_array(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
 
   /* Start timer. */
   polybench_start_instruments;
 
-  #ifdef MEM_OPT
-    /* Run memory optimize kernel. */
-    mem_kernel_cholesky(n, mv);
-  #else
-  {
-    #ifdef PARALLEL_OPT
-      /* Run optimize kernel. */
-      opt_kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
-    #else
-      /* Run kernel. */
-      kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
-    #endif
-  }
-  #endif
+  // #ifdef MEM_OPT
+  //   /* Run memory optimize kernel. */
+  //   mem_kernel_cholesky(n, mv);
+  // #else
+  // {
+  // #ifdef PARALLEL_OPT
+  //   /* Run optimize kernel. */
+  //   opt_kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
+  // #else
+  //   /* Run kernel. */
+  //   kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
+  // #endif
+  // }
+  // #endif
+
+  // TODO: Run cpu kernel.
+
+  // TODO: Run gpu kernel.
+
+  // TODO: Assert the CPU and GPU for correctness of the output..
 
   /* Stop and print timer. */
   polybench_stop_instruments;
@@ -241,11 +252,13 @@ int main(int argc, char **argv)
 
   /* Prevent dead-code elimination. All live-out data must be printed
      by the function call in argument. */
-  #ifdef MEM_OPT
-    polybench_prevent_dce(mem_print_array(n, mv));
-  #else
-   polybench_prevent_dce(print_array(n, POLYBENCH_ARRAY(A)));
-  #endif
+  // #ifdef MEM_OPT
+  //   polybench_prevent_dce(mem_print_array(n, mv));
+  // #else
+  //  polybench_prevent_dce(print_array(n, POLYBENCH_ARRAY(A)));
+  // #endif
+
+  polybench_prevent_dce(print_array(n, POLYBENCH_ARRAY(A)));
 
 
   /* Be clean. */
