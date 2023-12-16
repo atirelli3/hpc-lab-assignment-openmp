@@ -13,6 +13,8 @@
 
 #define Nq N*N
 
+#define BLOCK_SIZE 16
+
 /* Array initialization. */
 static void init_array(int n,
                        DATA_TYPE POLYBENCH_1D(p, N, n),
@@ -55,9 +57,8 @@ static void check_correctness(int n, int nq,
   printf("Assertion passed: Each element in A is equal to the corresponding element in A_lin.\n");
 }
 
-/* DCE code. Must scan the entire live-out data.
-   Can be used also to check the correctness of the output. */
-static void print_array(int n,
+/* DCE code. Must scan the entire live-out data. */
+static void print_dataset_matrix(int n,
                         DATA_TYPE POLYBENCH_2D(A, N, N, n, n))
 
 {
@@ -67,6 +68,21 @@ static void print_array(int n,
     for (j = 0; j < n; j++)
     {
       fprintf(stderr, DATA_PRINTF_MODIFIER, A[i][j]);
+      if ((i * N + j) % 20 == 0)
+        fprintf(stderr, "\n");
+    }
+}
+
+/* DCE code. Must scan the entire live-out data. */
+static void print_dataset_linear(int n, int nq,
+                                 DATA_TYPE POLYBENCH_1D(A_lin, Nq, nq))
+{
+  int i, j;
+
+  for (i = 0; i < n; i++)
+    for (j = 0; j < n; j++)
+    {
+      fprintf(stderr, DATA_PRINTF_MODIFIER, A_lin[i*n + j]);
       if ((i * N + j) % 20 == 0)
         fprintf(stderr, "\n");
     }
@@ -97,6 +113,30 @@ static void kernel_cholesky(int n,
   }
 }
 
+__global__ void device_cholesky(int n, DATA_TYPE *p, DATA_TYPE *A)
+{
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j, k;
+
+  if (i < n) {
+    DATA_TYPE x = A[i * n + i];
+
+    for (j = 0; j <= i - 1; ++j)
+      x = x - A[i * n + j] * A[i * n + j];
+    p[i] = 1.0 / sqrt(x);
+
+    // Ensure all threads have computed p[i] before using it
+    __syncthreads();
+
+    for (j = i + 1; j < n; ++j) {
+      x = A[i * n + j];
+      for (k = 0; k <= i - 1; ++k)
+        x = x - A[j * n + k] * A[i * n + k];
+      A[j * n + i] = x * p[i];
+    }
+  }
+}
+
 int main(int argc, char **argv)
 {
   /* Retrieve problem size. */
@@ -108,6 +148,15 @@ int main(int argc, char **argv)
   POLYBENCH_1D_ARRAY_DECL(p, DATA_TYPE, N, n);          // Support struct.
   POLYBENCH_1D_ARRAY_DECL(A_lin, DATA_TYPE, Nq, nq);    // Matrix A linearization.
 
+  /* Allocate pinned memory on the host. */
+  cudaHostAlloc((void**)&p, N * sizeof(DATA_TYPE), cudaHostAllocDefault);
+  cudaHostAlloc((void**)&A, N * N * sizeof(DATA_TYPE), cudaHostAllocDefault);
+
+  /* Allocate device memory */
+  DATA_TYPE *d_p, *d_A;
+  cudaMalloc((void**)&d_p, N * sizeof(DATA_TYPE));
+  cudaMalloc((void**)&d_A, N * N * sizeof(DATA_TYPE));
+
   /* Initialize array(s). */
   init_array(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
 
@@ -117,13 +166,23 @@ int main(int argc, char **argv)
   /* Check the correctness of the linearization. */
   check_correctness(n, nq, POLYBENCH_ARRAY(A_lin), POLYBENCH_ARRAY(A));
 
+  /* Copy data from pinned host memory to device memory. */
+  cudaMemcpy(d_p, p, N * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_A, A_lin, Nq * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
+
   /* Start timer. */
   polybench_start_instruments;
 
   /* Run kernel. */
   kernel_cholesky(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
 
-  // TODO: Run gpu kernel.
+  /* Run GPU kernel. */
+  int numBlocks = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  device_cholesky<<<numBlocks, BLOCK_SIZE>>>(n, d_p, d_A);
+
+  /* Copy results from device memory to pinned host memory. */
+  cudaMemcpy(p, d_p, N * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
+  cudaMemcpy(A_lin, d_A, Nq * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
 
   /* Check the correctness of the CPU and GPU/Device implementation. */
   check_correctness(n, nq, POLYBENCH_ARRAY(A_lin), POLYBENCH_ARRAY(A));
@@ -134,9 +193,12 @@ int main(int argc, char **argv)
 
   /* Prevent dead-code elimination. All live-out data must be printed
      by the function call in argument. */
-  // TODO: Add the DCE for linearization
-  // polybench_prevent_dce(print_array(n, POLYBENCH_ARRAY(A)));
+  // polybench_prevent_dce(print_dataset_matrix(n, POLYBENCH_ARRAY(A)));
+  // polybench_prevent_dce(print_dataset_linear(n, nq, POLYBENCH_ARRAY(A_lin)));
 
+  /* Free device memory. */
+  cudaFree(d_p);
+  cudaFree(d_A);
 
   /* Be clean. */
   POLYBENCH_FREE_ARRAY(A);
