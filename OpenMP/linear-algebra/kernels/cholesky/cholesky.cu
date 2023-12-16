@@ -16,7 +16,7 @@
 // #define DATA_TYPE float
 #define Nq N*N
 
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 32
 
 /* Array initialization. */
 static void init_array(int n, DATA_TYPE *p, DATA_TYPE *A)
@@ -109,37 +109,66 @@ static void kernel_cholesky(int n, DATA_TYPE *p, DATA_TYPE *A)
       A[j*n + i] = x * p[i];
     }
   }
+  //int i, j, k;
+//
+  //DATA_TYPE x;
+  //  for (i = 0; i < _PB_N; ++i) {
+  //      p[i] = 1 / sqrt(A[i*n + i] - p[i]);
+//
+  //      #pragma omp parallel for private(j, k, x)
+  //      for (j = i + 1; j < _PB_N; j++) {
+  //          x = A[i*n + j];
+  //          
+  //          #pragma omp simd reduction(-:x)
+  //          for (k = 0; k <= i - 1; ++k)
+  //              x = x - A[j*n + k] * A[i*n + k];
+//
+  //          A[j*n + i] = x * p[i];
+  //          p[j] += A[j*n + i] * A[j*n + i]; 
+  //      }
+  //  }
 }
-
-static void stream_cholesky(int n, DATA_TYPE *p, DATA_TYPE *A)
+__global__ void device_cholesky_1(int n,
+                                int i,
+                                DATA_TYPE *p,
+                                DATA_TYPE *A) 
 {
-  int i;
-  DATA_TYPE x;
-  for (i = 0; i )
-}
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  
+  if (tid == 0)
+    p[i] = A[i * n + i];
+  
+  __syncthreads();
 
-__global__ void device_cholesky(int n, DATA_TYPE *p, DATA_TYPE *A)
-{
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  int j, k;
-
-  if (i < n) {
-    DATA_TYPE x = A[i * n + i];
-
-    for (j = 0; j <= i - 1; ++j)
-      x = x - A[i * n + j] * A[i * n + j];
-    p[i] = 1.0 / sqrt(x);
-
-    // Ensure all threads have computed p[i] before using it
-    __syncthreads();
-
-    for (j = i + 1; j < n; ++j) {
-      x = A[i * n + j];
-      for (k = 0; k <= i - 1; ++k)
-        x = x - A[j * n + k] * A[i * n + k];
-      A[j * n + i] = x * p[i];
-    }
+  DATA_TYPE tmp = 0;
+  for (int j = 0; j < i; j += BLOCK_SIZE) {
+    int index = j + tid;
+    if (index < i) 
+      tmp -= A[i * n + index] * A[i * n + index];
   }
+
+  atomicAdd(&p[i], -tmp);
+
+  __syncthreads();
+
+  if (tid == 0) 
+    p[i] = 1 / sqrt(p[i]);
+}
+
+__global__ void device_cholesky_2(int n,
+                                int i,
+                                DATA_TYPE *p,
+                                DATA_TYPE *A) 
+{
+  int j = blockIdx.x * blockDim.x + threadIdx.x + i + 1;
+  if (j >= n)
+    return;
+
+  DATA_TYPE tmp = A[i*n + j];
+  for (int k = 0; k < i; k++)
+    tmp -= A[i*n + k] * A[j*n + k];
+  
+  A[j*n + i] = p[i] * tmp;
 }
 
 int main(int argc, char **argv)
@@ -156,7 +185,7 @@ int main(int argc, char **argv)
   /* Allocate pinned memory on the host. */
   cudaHostAlloc((void**)&p, N * sizeof(DATA_TYPE), cudaHostAllocDefault);
   cudaHostAlloc((void**)&A, N * N * sizeof(DATA_TYPE), cudaHostAllocDefault);
-  cudaHostAlloc((void**)&A_d, Nq * sizeof(DATA_TYPE), cudaHostAllocDefault);
+  cudaHostAlloc((void**)&A_d, N * N * sizeof(DATA_TYPE), cudaHostAllocDefault);
 
   /* Allocate device memory */
   DATA_TYPE *d_p, *d_A;
@@ -164,16 +193,9 @@ int main(int argc, char **argv)
   cudaMalloc((void**)&d_A, Nq * sizeof(DATA_TYPE));
 
   /* Initialize array(s). */
-  // init_array(n, POLYBENCH_ARRAY(p), POLYBENCH_ARRAY(A));
-  /* Initialize array(s). */
   init_array(n, p, A);
-  cudaMemcpy(A_d, A, Nq * sizeof(DATA_TYPE), cudaMemcpyHostToHost);
 
-  /* Linearize the matrix A in a 1D array [n*n]. */
-  // matrix_linearization(n, nq, POLYBENCH_ARRAY(A_lin), POLYBENCH_ARRAY(A));
-
-  /* Check the correctness of the linearization. */
-  check_correctness(n, A, A_d);
+  cudaMemcpy(A_d, A, N * N * sizeof(DATA_TYPE), cudaMemcpyHostToHost);
 
   /* Start timer. */
   polybench_start_instruments;
@@ -186,28 +208,38 @@ int main(int argc, char **argv)
   polybench_print_instruments;
 
   cudaMemset(&p, 0, N * sizeof(DATA_TYPE));
+  /* Run GPU kernel. */
 
-  /* Start timer. */
   polybench_start_instruments;
-
   /* Copy data from pinned host memory to device memory. */
   cudaMemcpy(d_p, p, N * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
   cudaMemcpy(d_A, A_d, Nq * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
+  
+  for (int i = 0; i < N; i++) {
+    device_cholesky_1<<<1, BLOCK_SIZE>>>(n, i, d_p, d_A);
 
-  /* Run GPU kernel. */
-  int numBlocks = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  device_cholesky<<<numBlocks, BLOCK_SIZE>>>(n, d_p, d_A);
-
+    if (i < n - 1) {
+      int numBlocks = (N - i + BLOCK_SIZE) / BLOCK_SIZE;
+      device_cholesky_2<<<numBlocks, BLOCK_SIZE>>>(n, i, d_p, d_A);
+    }
+  }
   /* Copy results from device memory to pinned host memory. */
   cudaMemcpy(p, d_p, N * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
   cudaMemcpy(A_d, d_A, Nq * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
 
-  /* Stop and print timer. */
   polybench_stop_instruments;
   polybench_print_instruments;
 
+  //print_dataset_matrix(n, A_d);
+  //    fprintf(stderr, "\n----------------------\n");
+  //print_dataset_matrix(n, A);
   /* Check the correctness of the CPU and GPU/Device implementation. */
-  check_correctness(n, A, A_d);
+  check_correctness(n, nq, A_d, A);
+
+  /* Prevent dead-code elimination. All live-out data must be printed
+     by the function call in argument. */
+  // polybench_prevent_dce(print_dataset_matrix(n, POLYBENCH_ARRAY(A)));
+  // polybench_prevent_dce(print_dataset_linear(n, nq, POLYBENCH_ARRAY(A_d)));
 
   /* Free device memory. */
   cudaFree(d_p);
