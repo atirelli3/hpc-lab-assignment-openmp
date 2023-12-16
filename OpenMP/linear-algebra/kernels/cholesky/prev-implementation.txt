@@ -1,0 +1,38 @@
+/* 
+* Main computational kernel on the device (GPU). 
+* 
+* The whole function will be timed, including the call and return. 
+*/
+static void device_cholesky(int n,
+                            DATA_TYPE POLYBENCH_1D(p, N, n),
+                            DATA_TYPE POLYBENCH_1D(A_opt, N, n))
+{
+
+}
+
+// TODO: Fix the output correctness.
+/* Main computational kernel optimize. The whole function will be timed,
+   including the call and return. */
+static void opt_kernel_cholesky(int n,
+                            DATA_TYPE POLYBENCH_1D(p, N, n),
+                            DATA_TYPE POLYBENCH_2D(A, N, N, n, n))
+{
+  int i, j, k;
+
+  DATA_TYPE x;
+    for (i = 0; i < _PB_N; ++i) {
+        p[i] = 1 / sqrt(A[i][i] - p[i]);
+
+        #pragma omp parallel for private(j, k, x)
+        for (j = i + 1; j < _PB_N; j++) {
+            x = A[i][j];
+            
+            #pragma omp simd reduction(-:x)
+            for (k = 0; k <= i - 1; ++k)
+                x = x - A[j][k] * A[i][k];
+
+            A[j][i] = x * p[i];
+            p[j] += A[j][i] * A[j][i]; 
+        }
+    }
+}
