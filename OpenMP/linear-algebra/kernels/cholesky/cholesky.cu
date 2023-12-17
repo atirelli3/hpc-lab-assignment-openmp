@@ -13,6 +13,8 @@
 
 #define BLOCK_SIZE 32
 
+#define DATA_TYPE float
+
 /* Array initialization. */
 static void init_array(int n, DATA_TYPE * __restrict__ p, 
                        DATA_TYPE * __restrict__ A)
@@ -104,73 +106,62 @@ static void kernel_cholesky(int n, DATA_TYPE * __restrict__ p,
   }
 }
 
+__global__ void compute_p(int n, int i, DATA_TYPE * __restrict__ p,
+                     DATA_TYPE * __restrict__ A)
+{
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (tid == 0)
+    p[i] = A[i * n + i];
+
+  __syncthreads();
+
+  DATA_TYPE tmp = 0;
+  for (int j = 0; j < i; j += BLOCK_SIZE) {
+    int index = j + tid;
+    if (index < i) 
+      tmp -= A[i * n + index] * A[i * n + index];
+  }
+  atomicAdd(&p[i], -tmp);
+
+  __syncthreads();
+
+  if (tid == 0) 
+    p[i] = 1 / sqrt(p[i]);
+}
+
+__global__ void compute_A(int n, int i, DATA_TYPE * __restrict__ p,
+                          DATA_TYPE * __restrict__ A) 
+{
+  int j = blockIdx.x * blockDim.x + threadIdx.x + i + 1;
+  if (j >= n)
+    return;
+
+  DATA_TYPE tmp = A[i*n + j];
+  for (int k = 0; k < i; k++)
+    tmp -= A[i*n + k] * A[j*n + k];
+
+  A[j*n + i] = p[i] * tmp;
+}
+
 static void device_cholesky(int n, DATA_TYPE * __restrict__ p, 
                             DATA_TYPE * __restrict__ A)
 {
-  int i, j;
-  DATA_TYPE x; // Non sicuro 
+  int i;
+  printf("1");
   for (i = 0; i < _PB_N; i++) {
-    x = A[i*n + i];
-    // CUDA Kernel p calc.
-
-    for (j = i + 1; j < _PB_N; ++j)
-    {
-      x = A[i*n + j];
-      // CUDA Kernel x calc.
-      // Wait the kernels/stream
-      A[j*n + i] = x * p[i];
+    printf("2");
+    compute_p<<<1, BLOCK_SIZE>>>(n, i, p, A);
+    printf("3");
+    if (i < n - 1) {
+      printf("4");
+      int numBlocks = (N - i + BLOCK_SIZE) / BLOCK_SIZE;
+      printf("5");
+      compute_A<<<numBlocks, BLOCK_SIZE>>>(n, i, p, A);
+      printf("6");
     }
   }
 }
-
-// __global__ void device_cholesky_1(int n, int i, DATA_TYPE *p, DATA_TYPE *A) 
-// {
-//   int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  
-//   if (tid == 0)
-//     p[i] = A[i * n + i];
-  
-//   __syncthreads();
-
-//   DATA_TYPE tmp = 0;
-//   for (int j = 0; j < i; j += BLOCK_SIZE) {
-//     int index = j + tid;
-//     if (index < i) 
-//       tmp -= A[i * n + index] * A[i * n + index];
-//   }
-  
-//   atomicAdd(&p[i], tmp);
-
-//   __syncthreads();
-
-//   if (tid == 0) 
-//     p[i] = 1 / sqrt(p[i]);
-// }
-
-// __global__ void device_cholesky_2(int n, int i, DATA_TYPE *p, DATA_TYPE *A) 
-// {
-//   int tid = blockIdx.x * blockDim.x + threadIdx.x;
-//   int j = tid + i + 1;
-
-//   __shared__ DATA_TYPE vec_shared[BLOCK_SIZE];
-
-//   DATA_TYPE tmp = (j < n) ? A[i*n + j] : 0;
-//   for (int bk = 0; bk < i; bk += BLOCK_SIZE) {
-//     int index = i * n + bk + tid;
-//     if (index < n)
-//       vec_shared[tid] = A[index];
-
-//     __syncthreads();
-
-//     for (int k = bk; j < n && k < bk + BLOCK_SIZE && k < i; k++)
-//       tmp -= vec_shared[k] * A[j*n + k];
-
-//     __syncthreads();
-//   }
-  
-//   if (j < n)
-//     A[j*n + i] = p[i] * tmp;
-// }
 
 int main(int argc, char **argv)
 {
