@@ -75,21 +75,20 @@ static void print_dataset(int n, DATA_TYPE *Dataset)
   }
 }
 
-/* DCE code. Must scan the entire live-out data. */
-static void print_dataset_linear(int n, int nq,
-                                 DATA_TYPE *A_d)
-{
-  int i, j;
+// /* DCE code. Must scan the entire live-out data. */
+// static void print_dataset_linear(int n, int nq,
+//                                  DATA_TYPE POLYBENCH_1D(A_lin, Nq, nq))
+// {
+//   int i, j;
 
-  for (i = 0; i < n; i++) {
-    for (j = 0; j < n; j++)
-    {
-      fprintf(stderr, DATA_PRINTF_MODIFIER, A_d[i*n + j]);
-    }
-
-    fprintf(stderr, "\n");
-  }
-}
+//   for (i = 0; i < n; i++)
+//     for (j = 0; j < n; j++)
+//     {
+//       fprintf(stderr, DATA_PRINTF_MODIFIER, A_lin[i*n + j]);
+//       if ((i * N + j) % 20 == 0)
+//         fprintf(stderr, "\n");
+//     }
+// }
 
 /* Main computational kernel. The whole function will be timed,
    including the call and return. */
@@ -219,6 +218,27 @@ int main(int argc, char **argv)
 
   /* Run kernel. */
   kernel_cholesky(n, p, A);
+
+  /* Stop and print timer. */
+  polybench_stop_instruments;
+  polybench_print_instruments;
+
+  cudaMemset(&p, 0, N * sizeof(DATA_TYPE));
+
+  /* Start timer. */
+  polybench_start_instruments;
+
+  /* Copy data from pinned host memory to device memory. */
+  cudaMemcpy(d_p, p, N * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_A, A_d, Nq * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
+
+  /* Run GPU kernel. */
+  int numBlocks = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  device_cholesky<<<numBlocks, BLOCK_SIZE>>>(n, d_p, d_A);
+
+  /* Copy results from device memory to pinned host memory. */
+  cudaMemcpy(p, d_p, N * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
+  cudaMemcpy(A_d, d_A, Nq * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
 
   /* Stop and print timer. */
   polybench_stop_instruments;
