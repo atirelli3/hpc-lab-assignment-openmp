@@ -113,7 +113,6 @@ __global__ void compute_p(int n, int i, DATA_TYPE * __restrict__ p,
 
   if (tid == 0)
     p[i] = A[i * n + i];
-
   __syncthreads();
 
   DATA_TYPE tmp = 0;
@@ -148,18 +147,13 @@ static void device_cholesky(int n, DATA_TYPE * __restrict__ p,
                             DATA_TYPE * __restrict__ A)
 {
   int i;
-  printf("1");
   for (i = 0; i < _PB_N; i++) {
-    printf("2");
     compute_p<<<1, BLOCK_SIZE>>>(n, i, p, A);
-    printf("3");
     if (i < n - 1) {
-      printf("4");
       int numBlocks = (N - i + BLOCK_SIZE) / BLOCK_SIZE;
-      printf("5");
       compute_A<<<numBlocks, BLOCK_SIZE>>>(n, i, p, A);
-      printf("6");
     }
+    cudaDeviceSynchronize();
   }
 }
 
