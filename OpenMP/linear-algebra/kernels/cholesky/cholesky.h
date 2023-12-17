@@ -34,7 +34,7 @@
 
 # ifndef DATA_TYPE
 #  define DATA_TYPE float
-#  define DATA_PRINTF_MODIFIER "%0.2f "
+#  define DATA_PRINTF_MODIFIER "%0.6f "
 # endif
 
 

@@ -25,11 +25,16 @@ static void init_array(int n,
   {
     p[i] = 0;   
     for (j = 0; j < n; j++)
-      A[i*n + j] = 1.0 / n;
-
+      A[i*n + j] = 1.0 / (i + j + 1);
   }
+
+  for (i = 0; i < n; i++)
+    A[i*n + i] += n;
 }
               
+bool areEqual(float a, float b, float epsilon = 1e-5) {
+    return std::abs(a - b) < epsilon;
+}
 
 /* Check the correctness of the two output. 
     If difference in output is found between A and A_d,
@@ -39,9 +44,14 @@ static void check_correctness(int n, int nq,
                               DATA_TYPE *A)
 {
   int i, j;
-  for (i = 0; i < n; i++)
-    for (j = 0; j < n; j++)
-      assert(A[i*n + j] == A_d[i*n + j]);
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < n; j++) {
+      if (!(areEqual(A[i*n +j], A_d[i*n + j]) || std::isnan(A[i*n + j]))) {
+        printf("Assertion failed: A[%d][%d] != A_d[%d][%d]. \n", i, j, i, j);
+        return;
+      }
+    }
+  }
 
   // If no assertion failures occurred, print a success message
   printf("Assertion passed: Each element in A is equal to the corresponding element in A_d.\n");
@@ -54,13 +64,14 @@ static void print_dataset_matrix(int n,
 {
   int i, j;
 
-  for (i = 0; i < n; i++)
+  for (i = 0; i < n; i++) {
     for (j = 0; j < n; j++)
     {
       fprintf(stderr, DATA_PRINTF_MODIFIER, A[i*n + j]);
-      if ((i * N + j) % 20 == 0)
-        fprintf(stderr, "\n");
     }
+
+        fprintf(stderr, "\n");
+  }
 }
 
 /* DCE code. Must scan the entire live-out data. */
@@ -73,7 +84,7 @@ static void print_dataset_linear(int n, int nq,
     for (j = 0; j < n; j++)
     {
       fprintf(stderr, DATA_PRINTF_MODIFIER, A_d[i*n + j]);
-      if ((i * N + j) % 20 == 0)
+      if ((i * N + j) % 32 == 0)
         fprintf(stderr, "\n");
     }
 }
@@ -199,11 +210,14 @@ int main(int argc, char **argv)
 
   cudaMemcpy(A_d, A, N * N * sizeof(DATA_TYPE), cudaMemcpyHostToHost);
 
+  print_dataset_matrix(n, A);
+      fprintf(stderr, "\n----------------------\n");
+
   /* Start timer. */
   polybench_start_instruments;
 
   /* Run kernel. */
-//  kernel_cholesky(n, p, A);
+  kernel_cholesky(n, p, A);
 
   /* Stop and print timer. */
   polybench_stop_instruments;
@@ -221,7 +235,7 @@ int main(int argc, char **argv)
     device_cholesky_1<<<1, BLOCK_SIZE>>>(n, i, d_p, d_A);
 
     if (i < n - 1) {
-      int numBlocks = (N - i + BLOCK_SIZE) / BLOCK_SIZE;
+      int numBlocks = (N - i - 2 + BLOCK_SIZE) / BLOCK_SIZE;
       device_cholesky_2<<<numBlocks, BLOCK_SIZE>>>(n, i, d_p, d_A);
     }
   }
@@ -232,11 +246,11 @@ int main(int argc, char **argv)
   polybench_stop_instruments;
   polybench_print_instruments;
 
-  //print_dataset_matrix(n, A_d);
-  //    fprintf(stderr, "\n----------------------\n");
-  //print_dataset_matrix(n, A);
+  print_dataset_matrix(n, A_d);
+      fprintf(stderr, "\n----------------------\n");
+  print_dataset_matrix(n, A);
   /* Check the correctness of the CPU and GPU/Device implementation. */
-  //check_correctness(n, nq, A_d, A);
+  check_correctness(n, nq, A_d, A);
 
   /* Prevent dead-code elimination. All live-out data must be printed
      by the function call in argument. */
