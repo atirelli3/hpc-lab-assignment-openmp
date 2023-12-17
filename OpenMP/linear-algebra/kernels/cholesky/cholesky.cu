@@ -47,7 +47,7 @@ static void check_correctness(int n, int nq,
   for (i = 0; i < n; i++) {
     for (j = 0; j < n; j++) {
       if (!(areEqual(A[i*n +j], A_d[i*n + j]) || std::isnan(A[i*n + j]))) {
-        printf("Assertion failed: A[%d][%d] != A_d[%d][%d]. \n", i, j, i, j);
+        printf("Assertion failed: A[%d][%d] != A_d[%d][%d]. %.6f %.6f\n", i, j, i, j, A[i*n+j], A_d[i*n+j]);
         return;
       }
     }
@@ -144,7 +144,7 @@ __global__ void device_cholesky_1(int n,
   
   __syncthreads();
 
-  DATA_TYPE tmp = 0;
+  DATA_TYPE tmp = 0.0;
   for (int j = 0; j < i; j += BLOCK_SIZE) {
     int index = j + tid;
     if (index < i) 
@@ -171,9 +171,9 @@ __global__ void device_cholesky_2(int n,
 
   DATA_TYPE tmp = (j < n) ? A[i*n + j] : 0;
   for (int bk = 0; bk < i; bk += BLOCK_SIZE) {
-    int index = i * n + bk + tid;
+    int index = bk + tid;
     if (index < n)
-      vec_shared[tid] = A[index];
+      vec_shared[tid] = A[i * n + index];
 
     __syncthreads();
 
@@ -187,30 +187,43 @@ __global__ void device_cholesky_2(int n,
     A[j*n + i] = p[i] * tmp;
 }
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+  bool test = code == cudaSuccess;
+  // cout << "code " << std::boolalpha<< test;
+   if (code != cudaSuccess)
+   {
+      // const char *errorStr = NULL;
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 int main(int argc, char **argv)
 {
   /* Retrieve problem size. */
   int n = N;
-  int nq = N*N;
+  int nq = N*N; 
 
   /* Variable declaration/allocation. */
-  DATA_TYPE *p, *A, *A_d;
+  DATA_TYPE *p, *p_d, *A, *A_d;
+
+  p = (DATA_TYPE*)malloc(N * sizeof(DATA_TYPE));
+  A = (DATA_TYPE*)malloc(N * N * sizeof(DATA_TYPE));
 
   /* Allocate pinned memory on the host. */
-  cudaHostAlloc((void**)&p, N * sizeof(DATA_TYPE), cudaHostAllocDefault);
-  cudaHostAlloc((void**)&A, N * N * sizeof(DATA_TYPE), cudaHostAllocDefault);
-  cudaHostAlloc((void**)&A_d, N * N * sizeof(DATA_TYPE), cudaHostAllocDefault);
+  gpuErrchk(cudaMallocHost((void**)&p_d, N * sizeof(DATA_TYPE)));
+  gpuErrchk(cudaMallocHost((void**)&A_d, N * N * sizeof(DATA_TYPE)));
 
   /* Allocate device memory */
   DATA_TYPE *d_p, *d_A;
-  cudaMalloc((void**)&d_p, N * sizeof(DATA_TYPE));
-  cudaMalloc((void**)&d_A, N * N * sizeof(DATA_TYPE));
+  gpuErrchk(cudaMalloc((void**)&d_p, N * sizeof(DATA_TYPE)));
+  gpuErrchk(cudaMalloc((void**)&d_A, N * N * sizeof(DATA_TYPE)));
 
   /* Initialize array(s). */
   init_array(n, p, A);
-
-  cudaMemcpy(A_d, A, N * N * sizeof(DATA_TYPE), cudaMemcpyHostToHost);
-
+  init_array(n, p_d, A_d);
 
   /* Start timer. */
   polybench_start_instruments;
@@ -230,26 +243,29 @@ int main(int argc, char **argv)
       }
       fprintf(stderr, "\n----------------------\n");
 
-  cudaMemset(&p, 0, N * sizeof(DATA_TYPE));
 
 
   /* Run GPU kernel. */
 
   polybench_start_instruments;
   /* Copy data from pinned host memory to device memory. */
-  cudaMemcpy(d_p, p, N * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_p, p_d, N * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
   cudaMemcpy(d_A, A_d, Nq * sizeof(DATA_TYPE), cudaMemcpyHostToDevice);
   
   for (int i = 0; i < N; i++) {
     device_cholesky_1<<<1, BLOCK_SIZE>>>(n, i, d_p, d_A);
+    cudaDeviceSynchronize();
 
     if (i < n - 1) {
       int numBlocks = (N - i - 2 + BLOCK_SIZE) / BLOCK_SIZE;
       device_cholesky_2<<<numBlocks, BLOCK_SIZE>>>(n, i, d_p, d_A);
     }
+
+    cudaDeviceSynchronize();
   }
+
   /* Copy results from device memory to pinned host memory. */
-  cudaMemcpy(p, d_p, N * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
+  cudaMemcpy(p_d, d_p, N * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
   cudaMemcpy(A_d, d_A, Nq * sizeof(DATA_TYPE), cudaMemcpyDeviceToHost);
 
   polybench_stop_instruments;
@@ -258,7 +274,7 @@ int main(int argc, char **argv)
   print_dataset_matrix(n, A_d);
       fprintf(stderr, "\n----------------------\n");
       for (int k = 0; k < n; k++) {
-        fprintf(stderr, "%.6f ", p[k]);
+        fprintf(stderr, "%.6f ", p_d[k]);
       }
       fprintf(stderr, "\n----------------------\n");
 
@@ -275,9 +291,13 @@ int main(int argc, char **argv)
   cudaFree(d_A);
 
   /* Be clean. */
-  cudaFreeHost(p);
-  cudaFreeHost(A);
+  cudaFreeHost(p_d);
   cudaFreeHost(A_d);
 
+  
+  free(p);
+  free(A);
+
+  cudaDeviceReset();
   return 0;
 }
