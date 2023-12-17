@@ -63,29 +63,20 @@ static void print_dataset(int n, DATA_TYPE *Dataset)
 {
   int i, j;
 
-  for (i = 0; i < n; i++)
+  for (i = 0; i < n; i++) {
     for (j = 0; j < n; j++)
     {
       fprintf(stderr, DATA_PRINTF_MODIFIER, Dataset[i*n + j]);
       if ((i * N + j) % 20 == 0)
         fprintf(stderr, "\n");
     }
+
+        fprintf(stderr, "\n");
+  }
 }
 
 // /* DCE code. Must scan the entire live-out data. */
 // static void print_dataset_linear(int n, int nq,
-//                                  DATA_TYPE POLYBENCH_1D(A_lin, Nq, nq))
-// {
-//   int i, j;
-
-//   for (i = 0; i < n; i++)
-//     for (j = 0; j < n; j++)
-//     {
-//       fprintf(stderr, DATA_PRINTF_MODIFIER, A_lin[i*n + j]);
-//       if ((i * N + j) % 20 == 0)
-//         fprintf(stderr, "\n");
-//     }
-// }
 
 /* Main computational kernel. The whole function will be timed,
    including the call and return. */
@@ -209,11 +200,14 @@ int main(int argc, char **argv)
 
   cudaMemcpy(A_d, A, N * N * sizeof(DATA_TYPE), cudaMemcpyHostToHost);
 
+  print_dataset_matrix(n, A);
+      fprintf(stderr, "\n----------------------\n");
+
   /* Start timer. */
   polybench_start_instruments;
 
   /* Run kernel. */
-//  kernel_cholesky(n, p, A);
+  kernel_cholesky(n, p, A);
 
   /* Stop and print timer. */
   polybench_stop_instruments;
@@ -231,7 +225,7 @@ int main(int argc, char **argv)
     device_cholesky_1<<<1, BLOCK_SIZE>>>(n, i, d_p, d_A);
 
     if (i < n - 1) {
-      int numBlocks = (N - i + BLOCK_SIZE) / BLOCK_SIZE;
+      int numBlocks = (N - i - 2 + BLOCK_SIZE) / BLOCK_SIZE;
       device_cholesky_2<<<numBlocks, BLOCK_SIZE>>>(n, i, d_p, d_A);
     }
   }
@@ -242,11 +236,11 @@ int main(int argc, char **argv)
   polybench_stop_instruments;
   polybench_print_instruments;
 
-  //print_dataset_matrix(n, A_d);
-  //    fprintf(stderr, "\n----------------------\n");
-  //print_dataset_matrix(n, A);
+  print_dataset_matrix(n, A_d);
+      fprintf(stderr, "\n----------------------\n");
+  print_dataset_matrix(n, A);
   /* Check the correctness of the CPU and GPU/Device implementation. */
-  //check_correctness(n, nq, A_d, A);
+  check_correctness(n, nq, A_d, A);
 
   /* Prevent dead-code elimination. All live-out data must be printed
      by the function call in argument. */
