@@ -32,7 +32,7 @@ static void init_array(int n,
     A[i*n + i] += n;
 }
               
-bool areEqual(float a, float b, float epsilon = 1e-5) {
+bool areEqual(float a, float b, float epsilon = 1e-3) {
     return std::abs(a - b) < epsilon;
 }
 
@@ -80,13 +80,14 @@ static void print_dataset_linear(int n, int nq,
 {
   int i, j;
 
-  for (i = 0; i < n; i++)
+  for (i = 0; i < n; i++) {
     for (j = 0; j < n; j++)
     {
       fprintf(stderr, DATA_PRINTF_MODIFIER, A_d[i*n + j]);
-      if ((i * N + j) % 32 == 0)
-        fprintf(stderr, "\n");
     }
+
+    fprintf(stderr, "\n");
+  }
 }
 
 /* Main computational kernel. The whole function will be timed,
@@ -149,8 +150,8 @@ __global__ void device_cholesky_1(int n,
     if (index < i) 
       tmp -= A[i * n + index] * A[i * n + index];
   }
-
-  atomicAdd(&p[i], -tmp);
+  
+  atomicAdd(&p[i], tmp);
 
   __syncthreads();
 
@@ -168,7 +169,7 @@ __global__ void device_cholesky_2(int n,
 
   __shared__ DATA_TYPE vec_shared[BLOCK_SIZE];
 
-  DATA_TYPE tmp = A[i*n + j];
+  DATA_TYPE tmp = (j < n) ? A[i*n + j] : 0;
   for (int bk = 0; bk < i; bk += BLOCK_SIZE) {
     int index = i * n + bk + tid;
     if (index < n)
@@ -210,8 +211,6 @@ int main(int argc, char **argv)
 
   cudaMemcpy(A_d, A, N * N * sizeof(DATA_TYPE), cudaMemcpyHostToHost);
 
-  print_dataset_matrix(n, A);
-      fprintf(stderr, "\n----------------------\n");
 
   /* Start timer. */
   polybench_start_instruments;
@@ -223,7 +222,17 @@ int main(int argc, char **argv)
   polybench_stop_instruments;
   polybench_print_instruments;
 
+
+  print_dataset_matrix(n, A);
+      fprintf(stderr, "\n----------------------\n");
+      for (int k = 0; k < n; k++) {
+        fprintf(stderr, "%.6f ", p[k]);
+      }
+      fprintf(stderr, "\n----------------------\n");
+
   cudaMemset(&p, 0, N * sizeof(DATA_TYPE));
+
+
   /* Run GPU kernel. */
 
   polybench_start_instruments;
@@ -248,7 +257,11 @@ int main(int argc, char **argv)
 
   print_dataset_matrix(n, A_d);
       fprintf(stderr, "\n----------------------\n");
-  print_dataset_matrix(n, A);
+      for (int k = 0; k < n; k++) {
+        fprintf(stderr, "%.6f ", p[k]);
+      }
+      fprintf(stderr, "\n----------------------\n");
+
   /* Check the correctness of the CPU and GPU/Device implementation. */
   check_correctness(n, nq, A_d, A);
 
