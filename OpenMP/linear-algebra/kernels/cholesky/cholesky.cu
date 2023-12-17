@@ -14,26 +14,36 @@
 #define BLOCK_SIZE 32
 
 /* Array initialization. */
-static void init_array(int n, DATA_TYPE *p, DATA_TYPE *A, DATA_TYPE *B)
+static void init_array(int n, DATA_TYPE * __restrict__ p, 
+                       DATA_TYPE * __restrict__ A)
 {
   int i, j;
   for (i = 0; i < n; i++)
   {
     p[i] = 0;   
     for (j = 0; j < n; j++)
-    {
       A[i*n + j] = 1.0 / (i + j + 1);
-      B[i*n + j] = A[i*n + j];
-    }
       
   }
 
   for (i = 0; i < n; i++)
-  {
     A[i*n + i] += n;
-    B[i*n + i] = A[i*n + i];
-  }
     
+}
+
+/* Clone the structs */
+static void clone_struct(int n, DATA_TYPE * __restrict__ a, 
+                         DATA_TYPE * __restrict__ b, 
+                         DATA_TYPE * __restrict__ A, 
+                         DATA_TYPE * __restrict__ B)
+{
+  int i, j;
+  for (i = 0; i < n; i++)
+  {
+    b[i] = a[i];
+    for (j = 0; j < n; j++)
+      B[i*n + j] = A[i*n + j];
+  }
 }
               
 bool areEqual(float a, float b, float epsilon = 1e-3) {
@@ -43,7 +53,8 @@ bool areEqual(float a, float b, float epsilon = 1e-3) {
 /* Check the correctness of the two output. 
   If difference in output is found between A and A_d,
   it will be assert. */
-static void check_correctness(int n, DATA_TYPE *A, DATA_TYPE *B)
+static void check_correctness(int n, DATA_TYPE * __restrict__ A, 
+                              DATA_TYPE * __restrict__ B)
 {
   int i, j;
   for (i = 0; i < n; i++) {
@@ -58,7 +69,7 @@ static void check_correctness(int n, DATA_TYPE *A, DATA_TYPE *B)
   printf("Assertion passed: Each element in A is equal to the corresponding element in A_d.\n");
 }
 
-static void print_dataset(int n, DATA_TYPE *dataset)
+static void print_dataset(int n, DATA_TYPE * __restrict__ dataset)
 {
   int i, j;
 
@@ -71,7 +82,8 @@ static void print_dataset(int n, DATA_TYPE *dataset)
 
 /* Main computational kernel. The whole function will be timed,
    including the call and return. */
-static void kernel_cholesky(int n, DATA_TYPE *p, DATA_TYPE *A)
+static void kernel_cholesky(int n, DATA_TYPE * __restrict__ p, 
+                            DATA_TYPE * __restrict__ A)
 {
   int i, j, k;
 
@@ -92,12 +104,22 @@ static void kernel_cholesky(int n, DATA_TYPE *p, DATA_TYPE *A)
   }
 }
 
-static void device_cholesky(int n, DATA_TYPE *p, DATA_TYPE *A)
+static void device_cholesky(int n, DATA_TYPE * __restrict__ p, 
+                            DATA_TYPE * __restrict__ A)
 {
-  int i;
-  DATA_TYPE x;
+  int i, j;
+  DATA_TYPE x; // Non sicuro 
   for (i = 0; i < _PB_N; i++) {
     x = A[i*n + i];
+    // CUDA Kernel p calc.
+
+    for (j = i + 1; j < _PB_N; ++j)
+    {
+      x = A[i*n + j];
+      // CUDA Kernel x calc.
+      // Wait the kernels/stream
+      A[j*n + i] = x * p[i];
+    }
   }
 }
 
@@ -156,16 +178,50 @@ int main(int argc, char **argv)
   int n = N;
 
   /* Variable declaration/allocation. */
-  DATA_TYPE *p, *A, *A_d;
+  DATA_TYPE *p, *A, *p_d, *A_d;
 
   /* Allocate in UVM */
-  cudaMallocManaged((void **)&p, sizeof(DATA_TYPE) * n);      // Allocate p.
-  cudaMallocManaged((void **)&A, sizeof(DATA_TYPE) * n * n);  // Allocate matrix (lin) A.
+  cudaMallocManaged((void **)&p, sizeof(DATA_TYPE) * n);        // Allocate p.
+  cudaMallocManaged((void **)&A, sizeof(DATA_TYPE) * n * n);    // Allocate matrix (lin) A.
+  cudaMallocManaged((void **)&p_d, sizeof(DATA_TYPE) * n);      // Allocate p.
   cudaMallocManaged((void **)&A_d, sizeof(DATA_TYPE) * n * n);  // Allocate matrix (lin) A.
 
   /* Initialize array(s). */
-  init_array(n, p, A, A_d);
+  init_array(n, p, A);
+  clone_struct(n, p, p_d, A, A_d);
 
   /* Check initialization math consistency. */
   check_correctness(n, A, A_d);
+
+  /* Start timer. */
+  polybench_start_instruments;
+
+  /* Run kernel. */
+  kernel_cholesky(n, p, A);
+
+  /* Stop and print timer. */
+  polybench_stop_instruments;
+  polybench_print_instruments;
+
+  // print_dataset(n, A);
+
+  /* Start timer. */
+  polybench_start_instruments;
+
+  device_cholesky(n, p_d, A_d);
+
+  /* Stop and print timer. */
+  polybench_stop_instruments;
+  polybench_print_instruments;
+
+  /* Check computational math consistency. */
+  check_correctness(n, A, A_d);
+  
+  /* Be clean */
+  cudaFree(p);
+  cudaFree(A);
+  cudaFree(p_d);
+  cudaFree(A_d);
+  cudaDeviceReset();
+  return 0;
 }
