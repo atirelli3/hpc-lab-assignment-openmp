@@ -129,6 +129,21 @@ static void kernel_cholesky(int n,
     }
 }
 
+__global__ void compute_A(int n, int i, DATA_TYPE * __restrict__ p,
+                          DATA_TYPE * __restrict__ A) 
+{
+  int j = blockIdx.x * blockDim.x + threadIdx.x + i + 1;
+  if (j >= n)
+    return;
+
+  DATA_TYPE tmp = A[i*n + j];
+  for (int k = 0; k < i; k++)
+    tmp -= A[i*n + k] * A[j*n + k];
+  
+  A[j*n + i] = p[i] * tmp;
+  p[j] += A[j*n + i] * A[j*n + i];
+}
+
 __global__ void device_cholesky(int n,
                                 int i,
                                 DATA_TYPE *p,
@@ -153,10 +168,8 @@ __global__ void device_cholesky(int n,
     __syncthreads();
   }
   
-  if (j < n) {
+  if (j < n) 
     A[j*n + i] = p[i] * tmp;
-    p[j] += A[j*n + i] * A[j*n + i];
-  }
 }
 
 int main(int argc, char **argv)
@@ -213,8 +226,8 @@ int main(int argc, char **argv)
 
     if (i < n - 1) {
       int numBlocks = (N - i - 2 + BLOCK_SIZE) / BLOCK_SIZE;
-      device_cholesky<<<numBlocks, BLOCK_SIZE>>>(n, i, p_d, A_d);
-
+      // device_cholesky<<<numBlocks, BLOCK_SIZE>>>(n, i, p_d, A_d);
+      compute_A<<<numBlocks, BLOCK_SIZE>>>(n, i, p_d, A_d);
       cudaDeviceSynchronize();
     }
   }
